@@ -10,6 +10,22 @@
     →: IMP (implication)
 """
 
+def negate_formula(formula: str) -> str:
+    """
+    Negates a formula by replacing:
+        A with ¬A
+        (A ∧ B) with ¬(A ∧ B)
+        (A ∨ B) with ¬(A ∨ B)
+    """
+    if formula.startswith('¬'):
+        # If already negated, remove the negation
+        return formula[1:]
+    elif formula.startswith('(') and formula.endswith(')'):
+        # If the formula is parenthesized, negate the entire expression
+        return f"¬({formula[1:-1]})"
+    else:
+        return f"¬{formula}"
+
 def find_expression_start(formula: str) -> int:
     """Finds the starting index of the expression to the left of our operator"""
     
@@ -316,6 +332,18 @@ def normalize_parentheses(formula: str) -> str:
     
     return simplified
 
+def cnf_to_clauses(formula: str) -> list:
+    """
+    Converts a CNF formula into a list of clauses.
+    
+    Each clause is represented as a set of literals.
+    """
+    # Split the formula by conjunctions
+    clauses = formula.split('∧')
+    
+    # Convert each clause into a set of literals with spaces removed
+    return [set(literal.strip() for literal in clause.strip().split('∨')) for clause in clauses]
+
 if __name__ == "__main__":
     # Testing the CNF conversion 
     formula = "r ↔ (p ∨ s)"
@@ -347,3 +375,10 @@ if __name__ == "__main__":
     # formula_cnf = normalize_spacing(formula_cnf)
     # formula_cnf = normalize_parentheses(formula_cnf)
     # print("After distributing the OR:", formula_cnf)
+
+    # Testing the CNF to clauses conversion
+    # Assuming the formula is already in CNF
+    cnf_formula = "P ∨ Q ∧ R ∨ S"
+    print("CNF formula:", cnf_formula)
+    clauses = cnf_to_clauses(cnf_formula)
+    print("Clauses:", clauses)
