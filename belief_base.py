@@ -7,36 +7,40 @@ class BeliefBase:
     Provides operations to add, remove, check, and list formulas.
     """
     def __init__(self):
-        self.formulas = []  # Initialize an empty list of formulas
+        """Initialize an empty belief base with prioritized formulas."""
+        self.formulas = []  # List of tuples (formula, priority)
 
-    def add_formula(self, formula: str):
+    def add_formula(self, formula: str, priority: int = 1):
         """
         Add a formula to the belief base if not already present.
         Formulas must be provided as strings.
         """
-        if formula not in self.formulas:
-            self.formulas.append(formula)
+        if not self.contains(formula):
+            self.formulas.append((formula, priority))
 
     def remove_formula(self, formula: str):
+        """Remove a formula from the belief base if it exists."""
+        self.formulas = [(f, p) for f, p in self.formulas if f != formula]
+
+    def empty(self) -> None:
         """
-        Remove a formula from the belief base if it exists.
-        Formulas must be provided as strings.
+        Empty the belief base by removing all formulas.
         """
-        if formula in self.formulas:
-            self.formulas.remove(formula)
+        self.formulas = []
+        print("Belief base emptied.")
 
     def contains(self, formula: str) -> bool:
         """
         Check if a formula is present in the belief base.
         Returns True if the formula is found, False otherwise.
         """
-        return formula in self.formulas
-
+        return any(f == formula for f, _ in self.formulas)
+    
     def list_formulas(self) -> list:
         """
         Returns a copy of the list of formulas in the belief base.
         """
-        return list(self.formulas)
+        return [f for f, _ in self.formulas]
     
     def entails(self, entailed_formula: str) -> bool:
         """
@@ -52,7 +56,7 @@ class BeliefBase:
         print("Negated formula:", negated_cnf_entailed_clauses)
         
         cnf_clauses = []
-        for formula in self.formulas:
+        for formula, _ in self.formulas:  # Unpack the tuple here
             cnf_formula = cnf_to_clauses(formula)
             cnf_clauses.extend(cnf_formula)
 
@@ -66,15 +70,66 @@ class BeliefBase:
 
         # Apply resolution; if unsatisfiable, then the belief base entails the formula
         return ResolutionChecker.resolution(cnf_clauses)
+    
+    def expansion(self, formula: str, priority: int = 1) -> bool:
+        """
+        Expand the belief base with a new formula.
+        
+        Args:
+            formula: The formula to add
+            priority: Priority of the formula (default=1)
+            
+        Returns:
+            bool: True if expansion was successful, False if formula was already present
+        """
+        # Check if formula is already present
+        if self.contains(formula):
+            print(f"Formula '{formula}' is already in the belief base.")
+            return False
+            
+        # Add the new formula
+        self.formulas.append((formula, priority))
+        print(f"Added '{formula}' with priority {priority}")
+        return True
 
 # Example usage
+#if __name__ == "__main__":
+    # Create a belief base
+#    bb = BeliefBase()
+    
+    # Test expansion
+ #   print("\n=== Testing Expansion ===")
+  #  bb.expansion("P", priority=2)
+   # bb.expansion("P → Q", priority=1)
+    #print(f"Current beliefs: {bb.list_formulas()}")
+    
+    # Test entailment after expansion
+  #  print("\n=== Testing Entailment ===")
+  #  result = bb.entails("Q")
+  #  print(f"P, P→Q entails Q? {result}")
+    
+    # Test duplicate expansion
+  #  print("\n=== Testing Duplicate Expansion ===")
+  #  result = bb.expansion("P", priority=3)
+  #  print(f"Expansion successful? {result}")
+  #  print(f"Final beliefs: {bb.list_formulas()}"))
+
+
 if __name__ == "__main__":
     # Create a belief base and add some formulas
     bb = BeliefBase()
 
+    # Empty the belief base
+    bb.empty()
+    print("After emptying:", bb.list_formulas())  # Should print: []
+
     # Add some formulas to the belief base
-    bb.add_formula("¬P ∨ Q")
-    bb.add_formula("P")
+    bb.add_formula("¬P ∨ Q", priority=2)
+    bb.add_formula("P", priority=1)
+
+    # Test expansion
+    bb.expansion("X", priority=2)
+    bb.expansion("P → Q", priority=1)
     
     # Check if the belief base entails a formula    
     # Extracting the clauses from the belief base for entailment checking
@@ -83,3 +138,4 @@ if __name__ == "__main__":
 
     entails_result = bb.entails("¬R")
     print("Entails ¬R:", entails_result)
+
