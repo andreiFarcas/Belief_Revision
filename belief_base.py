@@ -37,7 +37,37 @@ class BeliefBase:
         Returns a copy of the list of formulas in the belief base.
         """
         return list(self.formulas)
-    
+
+    def expansion(self, formula: str, priority: int = 0):
+        """
+        AGM Expansion: simply add the new formula.
+        """
+        self.add_formula(formula, priority)
+        return self.list_formulas()
+
+    def contraction(self, formula: str):
+        """
+        AGM Contraction: remove formula based on priority order (least important beliefs first).
+
+        Strategy:
+        - Find all beliefs that help imply the formula.
+        - Prefer removing formulas with lower priority (less entrenched).
+        - Minimal removal: remove as few as needed.
+        """
+        # Step 1: Sort formulas by priority (low priority first)
+        self.formulas.sort(key=lambda x: x[1])
+
+        # Step 2: Check if formula is implied (mocked for now, could use full entailment check)
+        if not any(f == formula for (f, _) in self.formulas):
+            # If formula not present, vacuity applies
+            return self.list_formulas()
+
+        # Step 3: Remove formulas that support formula (lowest priority first)
+        for f, _ in self.formulas:
+            if f == formula:
+                self.remove_formula(f)
+                break  # Only remove what is necessary
+
     def entails(self, entailed_formula: str) -> bool:
         """
         Check if the belief base entails a given formula.
@@ -83,3 +113,36 @@ if __name__ == "__main__":
 
     entails_result = bb.entails("¬R")
     print("Entails ¬R:", entails_result)
+
+def test_belief_base():
+    print("🔵 Creating belief base...")
+    bb = BeliefBase()
+
+    # Add initial formulas
+    bb.add_formula("P")
+    bb.add_formula("Q")
+    bb.add_formula("R")
+
+    print("\n✅ Initial Belief Base:")
+    print(bb.list_formulas())
+
+    # Expansion test
+    print("\n🟢 Expanding with formula 'S'...")
+    bb.expansion("S")
+    print("Belief base after expansion:")
+    print(bb.list_formulas())
+
+    # Contraction test
+    print("\n🟠 Contracting belief base on 'Q'...")
+    bb.contraction("Q")
+    print("Belief base after contraction:")
+    print(bb.list_formulas())
+
+    # Contraction test with a formula not present
+    print("\n🟠 Contracting belief base on non-existent formula 'T'...")
+    bb.contraction("T")
+    print("Belief base after contraction attempt (should be no change):")
+    print(bb.list_formulas())
+
+if __name__ == "__main__":
+    test_belief_base()
