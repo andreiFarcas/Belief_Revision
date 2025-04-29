@@ -131,4 +131,4 @@ if __name__ == "__main__":
         print("The entailment (P ∧ (P → Q)) ⊨ Q is valid.")
     else:
         print("The entailment is not valid.")
-    
+        
