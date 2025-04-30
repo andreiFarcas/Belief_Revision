@@ -1,4 +1,5 @@
 from resolution_checker import ResolutionChecker
+from itertools import combinations
 from cnf_converter import negate_formula, cnf_to_clauses
 
 class BeliefBase:
@@ -71,6 +72,67 @@ class BeliefBase:
         # Apply resolution; if unsatisfiable, then the belief base entails the formula
         return ResolutionChecker.resolution(cnf_clauses)
     
+    def contraction(self, formula: str) -> bool:
+        """
+        Contract a formula from the belief base using partial meet contraction.
+        Removes the formula while preserving as many high-priority beliefs as possible.
+    
+        Args:
+        formula: The formula to remove
+        
+        Returns:
+        bool: True if contraction was successful, False if formula wasn't present
+        """
+        # If formula isn't entailed, nothing to contract
+        if not self.entails(formula):
+            print(f"Formula '{formula}' is not entailed by belief base.")
+            return False
+
+        # Find all maximal subsets that don't entail the formula
+        maximal_subsets = []
+        current_formulas = self.list_formulas()
+    
+        # Try different sized combinations, from largest to smallest
+        for size in range(len(self.formulas), 0, -1):
+            for subset in combinations(self.formulas, size):
+                # Create temporary belief base with this subset
+                temp_bb = BeliefBase()
+                for f, p in subset:
+                    temp_bb.add_formula(f, p)
+            
+                # If this subset doesn't entail the formula
+                if not temp_bb.entails(formula):
+                    # Check if it's maximal
+                    is_maximal = True
+                    for f, p in self.formulas:
+                        if (f, p) not in subset:
+                            temp_bb.add_formula(f, p)
+                            if not temp_bb.entails(formula):
+                                is_maximal = False
+                                break
+                            temp_bb.remove_formula(f)
+                
+                    if is_maximal:
+                        maximal_subsets.append(subset)
+                        break  # Found a maximal subset at this size
+        
+            # If we found any maximal subsets at this size, stop looking
+            if maximal_subsets:
+                break
+
+        if not maximal_subsets:
+            print("Could not find suitable contraction.")
+            return False
+
+        # Select best subset based on priorities
+        best_subset = max(maximal_subsets, 
+                        key=lambda s: (len(s), sum(p for _, p in s)))
+    
+        # Update belief base
+        self.formulas = list(best_subset)
+        print(f"Contracted '{formula}'. Remaining beliefs: {self.list_formulas()}")
+        return True
+    
     def expansion(self, formula: str, priority: int = 1) -> bool:
         """
         Expand the belief base with a new formula.
@@ -130,6 +192,11 @@ if __name__ == "__main__":
     # Test expansion
     bb.expansion("X", priority=2)
     bb.expansion("P → Q", priority=1)
+
+    # Contract Q
+    print("\nContracting 'Q'...")
+    bb.contraction("Q")
+    print("Final beliefs:", bb.list_formulas())
     
     # Check if the belief base entails a formula    
     # Extracting the clauses from the belief base for entailment checking
@@ -138,4 +205,3 @@ if __name__ == "__main__":
 
     entails_result = bb.entails("¬R")
     print("Entails ¬R:", entails_result)
-
