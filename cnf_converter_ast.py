@@ -1,4 +1,3 @@
-import re
 from copy import deepcopy # For checking convergence in distribution
 
 # --- AST Node Definitions ---
@@ -317,50 +316,142 @@ def distribute_or_over_and_ast(formula: Formula) -> Formula:
          raise TypeError(f"Unexpected formula type during distribution: {type(formula)}")
 
 
+def extract_literals_from_clause(clause_node: Formula) -> set[str]:
+    """
+    Recursively extracts all literals (as strings) from an AST node
+    representing a single clause (a disjunction of literals, or a single literal).
+    """
+    literals_set = set()
+
+    def collect(node: Formula):
+        if isinstance(node, Or):
+            # Recursively collect from both sides of the disjunction
+            collect(node.left)
+            collect(node.right)
+        elif isinstance(node, Literal):
+            # Base case: found a positive literal
+            literals_set.add(repr(node))
+        elif isinstance(node, Not) and isinstance(node.operand, Literal):
+            # Base case: found a negative literal
+            literals_set.add(repr(node))
+        elif isinstance(node, Not) and not isinstance(node.operand, Literal):
+             # This shouldn't happen in a valid NNF/CNF clause
+             raise TypeError(f"Invalid CNF clause structure: Found Not({type(node.operand)})")
+        else:
+             # This shouldn't happen in a valid CNF clause (e.g., finding an And)
+             raise TypeError(f"Invalid CNF clause structure: Found unexpected node type {type(node)}")
+
+    collect(clause_node)
+    return literals_set
+
+
+def cnf_ast_to_clauses(cnf_ast: Formula) -> list[set[str]]:
+    """
+    Converts a CNF formula AST into a list of clauses.
+    Each clause is represented as a set of literal strings.
+
+    Assumes the input AST is the result of the CNF conversion process
+    (a conjunction of disjunctions of literals).
+    """
+    clauses_list = []
+
+    def find_conjuncts(node: Formula):
+        """Recursively traverses the AND nodes to find individual clauses."""
+        if isinstance(node, And):
+            # Explore both branches of the conjunction
+            find_conjuncts(node.left)
+            find_conjuncts(node.right)
+        # If it's not an And, it must be a clause (Or, Literal, or Not)
+        # Note: A valid CNF formula shouldn't contain Implies/Iff here.
+        elif isinstance(node, (Or, Literal, Not)):
+            try:
+                clause_literals = extract_literals_from_clause(node)
+                if clause_literals: # Avoid adding empty sets if something weird happens
+                    clauses_list.append(clause_literals)
+            except TypeError as e:
+                # Propagate errors from literal extraction
+                raise TypeError(f"Error extracting literals from potential clause node {node}: {e}")
+        else:
+             # Should not encounter other types like Implies/Iff at the top level of CNF
+             raise TypeError(f"Unexpected node type in CNF structure: {type(node)}")
+
+    # Handle the edge case of an empty input or a formula that somehow reduces
+    # to a non-standard node type (though this shouldn't happen with the main converter)
+    if not isinstance(cnf_ast, Formula):
+         # Or perhaps return [] or raise error depending on desired behavior for invalid input
+         return []
+
+    find_conjuncts(cnf_ast)
+
+    # If the original formula was just a single clause (no 'And' nodes),
+    # find_conjuncts would have added it directly. If it was empty or invalid,
+    # the list might be empty.
+
+    return clauses_list
+
+
 # --- CNF Conversion Orchestrator ---
 
-def to_cnf(formula_string: str) -> str:
+def to_cnf(formula_string: str, return_ast=False) -> Formula | str:
     """
-    Converts a propositional logic formula string to CNF string.
+    Converts a propositional logic formula string to CNF.
+    Returns the CNF as a string by default, or the final AST if return_ast is True.
     """
     # 1. Parse the input string into an AST
     try:
         parser = Parser(formula_string)
         ast = parser.parse()
     except ValueError as e:
-        return f"Error parsing formula: {e}"
+        # Returning error string directly if parsing fails
+        error_msg = f"Error parsing formula: {e}"
+        if return_ast:
+            # Can't return an AST if parsing failed, maybe raise exception or return None?
+            # For consistency let's raise here if AST was expected.
+            raise ValueError(error_msg)
+        return error_msg
     except TypeError as e:
-         return f"Error during AST node creation: {e}" # Should ideally be caught earlier
-    # print(f"Initial AST: {ast}") # Debugging
+         # Returning error string directly if AST node creation fails
+        error_msg = f"Error during AST node creation: {e}"
+        if return_ast:
+            raise TypeError(error_msg) # Raise if AST was expected
+        return error_msg
 
-    # 2. Eliminate IFF (↔)
-    ast_no_iff = eliminate_iff_ast(ast)
-    # print(f"After IFF elimination: {ast_no_iff}") # Debugging
+    # --- Perform Transformations ---
+    try:
+        # 2. Eliminate IFF (↔)
+        ast_no_iff = eliminate_iff_ast(ast)
+        # 3. Eliminate IMP (→)
+        ast_no_imp = eliminate_imp_ast(ast_no_iff)
+        # 4. Move Negations Inwards (NNF)
+        ast_nnf = move_negation_inwards_ast(ast_no_imp)
+        # 5. Distribute OR over AND (repeatedly until no changes)
+        prev_ast = None
+        current_ast = ast_nnf
+        loop_count = 0 # Safety break for potential infinite loops (shouldn't happen)
+        MAX_LOOPS = 100
+        while prev_ast != current_ast:
+            if loop_count > MAX_LOOPS:
+                 raise RecursionError("Distribution did not converge; potential infinite loop.")
+            prev_ast = deepcopy(current_ast)
+            current_ast = distribute_or_over_and_ast(prev_ast)
+            loop_count += 1
 
-    # 3. Eliminate IMP (→)
-    ast_no_imp = eliminate_imp_ast(ast_no_iff)
-    # print(f"After IMP elimination: {ast_no_imp}") # Debugging
+        final_cnf_ast = current_ast
 
-    # 4. Move Negations Inwards (NNF)
-    ast_nnf = move_negation_inwards_ast(ast_no_imp)
-    # print(f"After NNF: {ast_nnf}") # Debugging
+    except (TypeError, ValueError, RecursionError) as e:
+         # Catch errors during transformation steps
+        error_msg = f"Error during CNF transformation: {e}"
+        if return_ast:
+             raise type(e)(error_msg) # Re-raise specific error if AST was expected
+        return error_msg
 
-    # 5. Distribute OR over AND (repeatedly until no changes)
-    prev_ast = None
-    current_ast = ast_nnf
-    # Keep applying distribution until the formula stabilizes
-    # Use deepcopy for comparison as transformations might modify in place if not careful
-    # (though current implementation returns new objects)
-    while prev_ast != current_ast:
-        prev_ast = deepcopy(current_ast) # Or just use current_ast if __eq__ is reliable
-        current_ast = distribute_or_over_and_ast(prev_ast)
-        # print(f"Distribution pass: {current_ast}") # Debugging
 
-    # 6. Format the final CNF AST back to string
-    # The __repr__ of the AST nodes should give a reasonably readable format
-    # with necessary parentheses based on the structure.
-    return repr(current_ast)
-
+    # 6. Return final AST or its string representation
+    if return_ast:
+        return final_cnf_ast
+    else:
+        return repr(final_cnf_ast)
+    
 
 # --- Example Usage ---
 
@@ -407,26 +498,20 @@ if __name__ == "__main__":
              print(f"!! Warning: Could not re-parse generated CNF: {e}")
         print("-" * 30)
 
-    # Example from user code
+    # Example from Course
     formula = "r ↔ (p ∨ s)"
-    print(f"User Original: {formula}")
-    print(f"User CNF:      {to_cnf(formula)}")
+    print(f"Lecture example: {formula}")
+    print(f"CNF:      {to_cnf(formula)}")
     print("-" * 30)
 
     # Test case requiring recursive distribution
     formula = "(a ∧ b) ∨ (c ∧ d)"
     print(f"Original:  {formula}")
     print(f"CNF:       {to_cnf(formula)}")
-    # Expected CNF: (((a ∨ c) ∧ (a ∨ d)) ∧ ((b ∨ c) ∧ (b ∨ d)))
-    # (Exact parenthesis structure might vary slightly but should be logically equivalent)
     print("-" * 30)
 
     # Test NNF carefully
     formula = "¬(a → ¬b)"
     print(f"Original:  {formula}")
     print(f"CNF:       {to_cnf(formula)}")
-    # Step-by-step:
-    # ¬(¬a ∨ ¬b)  -- Eliminate IMP
-    # ¬¬a ∧ ¬¬b  -- NNF (De Morgan)
-    # a ∧ b       -- NNF (Double Negation)
     print("-" * 30)

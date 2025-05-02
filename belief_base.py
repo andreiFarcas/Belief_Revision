@@ -1,6 +1,7 @@
 from resolution_checker import ResolutionChecker
 from itertools import combinations
 from cnf_converter import negate_formula, cnf_to_clauses
+from cnf_converter_ast import to_cnf, cnf_ast_to_clauses
 
 class BeliefBase:
     """
@@ -54,12 +55,13 @@ class BeliefBase:
         """
         negated_entailed_formula = negate_formula(entailed_formula)
         negated_cnf_entailed_clauses = cnf_to_clauses(negated_entailed_formula)
-        print("Negated formula:", negated_cnf_entailed_clauses)
+        #print("Negated formula:", negated_cnf_entailed_clauses)
         
         cnf_clauses = []
-        for formula, _ in self.formulas:  # Unpack the tuple here
-            cnf_formula = cnf_to_clauses(formula)
-            cnf_clauses.extend(cnf_formula)
+        for formula, _ in self.formulas:  
+            cnf_formula_ast = to_cnf(formula, return_ast=True)
+            cnf_clauses_ast = cnf_ast_to_clauses(cnf_formula_ast)
+            cnf_clauses.extend(cnf_clauses_ast)
 
         print("Belief base:", self.list_formulas())
         print("CNF Clauses:", cnf_clauses)
@@ -67,7 +69,7 @@ class BeliefBase:
         # Combine the belief base clauses with the negated formula clauses
         cnf_clauses.extend(negated_cnf_entailed_clauses)
 
-        print("Final CNF Clauses with negated formula included:", cnf_clauses)
+        #print("Final CNF Clauses with negated formula included:", cnf_clauses)
 
         # Apply resolution; if unsatisfiable, then the belief base entails the formula
         return ResolutionChecker.resolution(cnf_clauses)
@@ -154,28 +156,6 @@ class BeliefBase:
         print(f"Added '{formula}' with priority {priority}")
         return True
 
-# Example usage
-#if __name__ == "__main__":
-    # Create a belief base
-#    bb = BeliefBase()
-    
-    # Test expansion
- #   print("\n=== Testing Expansion ===")
-  #  bb.expansion("P", priority=2)
-   # bb.expansion("P → Q", priority=1)
-    #print(f"Current beliefs: {bb.list_formulas()}")
-    
-    # Test entailment after expansion
-  #  print("\n=== Testing Entailment ===")
-  #  result = bb.entails("Q")
-  #  print(f"P, P→Q entails Q? {result}")
-    
-    # Test duplicate expansion
-  #  print("\n=== Testing Duplicate Expansion ===")
-  #  result = bb.expansion("P", priority=3)
-  #  print(f"Expansion successful? {result}")
-  #  print(f"Final beliefs: {bb.list_formulas()}"))
-
 
 if __name__ == "__main__":
     # Create a belief base and add some formulas
@@ -191,17 +171,40 @@ if __name__ == "__main__":
 
     # Test expansion
     bb.expansion("X", priority=2)
-    bb.expansion("P → Q", priority=1)
+    new_formula = "P → Q"
+    new_formula_cnf = to_cnf(new_formula)
+    bb.expansion(new_formula_cnf, priority=1)
 
     # Contract Q
     print("\nContracting 'Q'...")
     bb.contraction("Q")
-    print("Final beliefs:", bb.list_formulas())
-    
-    # Check if the belief base entails a formula    
-    # Extracting the clauses from the belief base for entailment checking
-    entails_result = bb.entails("Q")
-    print("Entails Q:", entails_result)
 
-    entails_result = bb.entails("¬R")
-    print("Entails ¬R:", entails_result)
+    print("After contraction:", bb.list_formulas())  # Should not contain Q
+
+    # Test entailment  
+    print("\nTesting entailment...")
+    kb_sentences = [
+        "C",           # It is cloudy
+        "C → R",       # If cloudy, then its raining
+        "R → U",       # If its raining, take umbrella
+        "U ↔ W",       # Take umbrella iff and only if wear coat
+        "¬R → ¬W"      # If not raining, do not wear coat
+    ]
+
+    bb.empty()
+
+    for sentence in kb_sentences:
+        sentence_cnf = to_cnf(sentence)
+        bb.add_formula(sentence_cnf, priority=1)
+        print(f"Added: {sentence_cnf}")
+    print()
+    
+    # 1. Query that SHOULD be entailed
+    query_entailed = "W" # Do I wear a coat
+    entails_result = bb.entails(query_entailed)
+    print(f"KB entails '{query_entailed}': {entails_result} (Expected: True)\n")
+
+    # 2. Query that should NOT be entailed
+    query_not_entailed = "¬C" # It is not cloudy
+    entails_result = bb.entails(query_not_entailed)
+    print(f"KB entails '{query_not_entailed}': {entails_result} (Expected: False)\n")

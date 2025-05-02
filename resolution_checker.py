@@ -73,7 +73,7 @@ class ResolutionChecker:
                     
                     resolvents = ResolutionChecker.resolve(clause1, clause2)
                     
-                    print(f"Resolving {clause1} and {clause2} gives: {resolvents}")
+                    #print(f"Resolving {clause1} and {clause2} gives: {resolvents}")
 
                     # Check if any resolvent is the empty clause
                     for resolvent in resolvents:

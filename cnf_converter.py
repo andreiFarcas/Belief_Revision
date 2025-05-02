@@ -220,8 +220,39 @@ def distribute_or(formula: str) -> str:
         (A ∨ (B ∧ C)) = ((A ∨ B) ∧ (A ∨ C))
         ((A ∧ B) ∨ C) = ((A ∨ C) ∧ (B ∨ C))
     """
-    # TODO: Implement the distribution of OR over AND
-    pass
+    # This is a non-trivial task for arbitrary formulas.
+    # For a full implementation, you would need to parse the formula into an AST.
+    # Here is a simple recursive approach for formulas already in NNF and with parentheses.
+
+    # Base case: if there are no ANDs or ORs, return as is
+    if '∧' not in formula and '∨' not in formula:
+        return formula
+
+    # Find the main operator at the top level (not inside parentheses)
+    balance = 0
+    for i, char in enumerate(formula):
+        if char == '(':
+            balance += 1
+        elif char == ')':
+            balance -= 1
+        elif balance == 0:
+            if char == '∨':
+                # Split into left and right
+                left = formula[:i].strip()
+                right = formula[i+1:].strip()
+                # If either side contains an AND at the top level, distribute
+                if '∧' in left:
+                    # (A ∧ B) ∨ C => (A ∨ C) ∧ (B ∨ C)
+                    left_parts = [part.strip() for part in left.split('∧')]
+                    distributed = [f"({lp} ∨ {right})" for lp in left_parts]
+                    return ' ∧ '.join(distributed)
+                if '∧' in right:
+                    # A ∨ (B ∧ C) => (A ∨ B) ∧ (A ∨ C)
+                    right_parts = [part.strip() for part in right.split('∧')]
+                    distributed = [f"({left} ∨ {rp})" for rp in right_parts]
+                    return ' ∧ '.join(distributed)
+    # If no distribution needed, return as is
+    return formula
 
 def normalize_spacing(formula: str) -> str:
     """
@@ -371,10 +402,10 @@ if __name__ == "__main__":
     print("After pushing negations inwards:", formula_nnf)
 
     #Step 4: Distribute OR over AND
-    # formula_cnf = distribute_or(formula_nnf)
-    # formula_cnf = normalize_spacing(formula_cnf)
-    # formula_cnf = normalize_parentheses(formula_cnf)
-    # print("After distributing the OR:", formula_cnf)
+    formula_cnf = distribute_or(formula_nnf)
+    formula_cnf = normalize_spacing(formula_cnf)
+    formula_cnf = normalize_parentheses(formula_cnf)
+    print("After distributing the OR:", formula_cnf)
 
     # Testing the CNF to clauses conversion
     # Assuming the formula is already in CNF
