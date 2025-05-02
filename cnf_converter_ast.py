@@ -1,3 +1,13 @@
+"""
+    THIS CODE HAS BEEN DEVELOPED WITH THE USE OF AI ASSISTANCE.
+
+    An alternative can be found in the cnf_converter.py file.
+
+    This version uses an AST (Abstract Syntax Tree) to represent the formula.
+    The cnf_converter.py version uses a string representation of the formula.
+"""
+
+
 from copy import deepcopy # For checking convergence in distribution
 
 # --- AST Node Definitions ---
