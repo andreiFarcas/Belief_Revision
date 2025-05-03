@@ -15,6 +15,7 @@ This project implements a belief base for propositional logic, supporting belief
 - `cnf_converter.py` — String-based CNF conversion utilities
 - `cnf_converter_ast.py` — AST-based CNF conversion utilities
 - `resolution_checker.py` — Resolution algorithm for entailment checking
+- `test_agm_postulates.py` — Test file for the AGM postulates
 
 ## Usage
 
