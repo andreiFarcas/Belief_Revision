@@ -208,3 +208,11 @@ if __name__ == "__main__":
     query_not_entailed = "¬C" # It is not cloudy
     entails_result = bb.entails(query_not_entailed)
     print(f"KB entails '{query_not_entailed}': {entails_result} (Expected: False)\n")
+
+    #Test AGM Postulates
+    bb = BeliefBase()
+    bb.add_formula("¬P ∨ Q")
+    bb.add_formula("P")
+    assert bb.entails("Q")  # Must be True before contraction
+    bb.contraction("Q")
+    assert not bb.entails("Q")  # Success postulate: Q no longer entailed
